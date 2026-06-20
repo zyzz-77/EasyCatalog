@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -477,14 +478,14 @@ class _QrSection extends StatelessWidget {
   String _buildQrData() {
     if (user == null) return '';
     final data = {
+      'merchantId': FirebaseAuth.instance.currentUser?.uid ?? '',
       'restaurantName': user!.restaurantName,
       'restaurantLocation': user!.restaurantLocation,
       'menu': user!.menu,
     };
     final jsonStr = jsonEncode(data);
     final encoded = base64Url.encode(utf8.encode(jsonStr));
-    // Ganti URL ini dengan URL deploy EasyOrder kamu
-    return 'https://easyorder.web.app/?data=$encoded';
+    return 'https://easycatalog-app.web.app/?data=$encoded';
   }
 
   @override

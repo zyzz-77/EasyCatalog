@@ -26,7 +26,7 @@ class _CartScreenState extends State<CartScreen> {
     if (_cart.items.isEmpty) return;
     setState(() => _loading = true);
     await Future.delayed(const Duration(milliseconds: 800));
-    final order = _orderService.placeOrder(
+    final order = await _orderService.placeOrder(
       _auth.currentUser?.name ?? 'Pelanggan',
       _cart.items.toList(),
     );
@@ -130,8 +130,7 @@ class _CartScreenState extends State<CartScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color:
-                                        AppTheme.primary.withOpacity(0.08),
+                                    color: AppTheme.primary.withOpacity(0.08),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Icon(Icons.fastfood_rounded,
@@ -168,10 +167,8 @@ class _CartScreenState extends State<CartScreen> {
                                           borderRadius:
                                               BorderRadius.circular(6),
                                         ),
-                                        child: const Icon(
-                                            Icons.remove_rounded,
-                                            color: AppTheme.primary,
-                                            size: 16),
+                                        child: const Icon(Icons.remove_rounded,
+                                            color: AppTheme.primary, size: 16),
                                       ),
                                     ),
                                     Padding(
@@ -268,8 +265,7 @@ class _CartScreenState extends State<CartScreen> {
                               width: 22,
                               height: 22,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Colors.black54))
+                                  strokeWidth: 2.5, color: Colors.black54))
                           : const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [

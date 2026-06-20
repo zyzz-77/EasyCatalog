@@ -1,100 +1,120 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easyorder/models/models.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
-  AuthService._internal();
+  AuthService._internal() {
+    _auth.authStateChanges().listen((user) {
+      if (user == null) {
+        _currentUser = null;
+        _docSub?.cancel();
+      } else {
+        _listenToUserDoc(user.uid);
+      }
+    });
+  }
+
+  final _auth = FirebaseAuth.instance;
+  final _db = FirebaseFirestore.instance;
 
   UserModel? _currentUser;
   UserModel? get currentUser => _currentUser;
-  bool get isLoggedIn => _currentUser != null;
+  bool get isLoggedIn => _auth.currentUser != null;
 
-  // Mock user database
-  static final List<Map<String, dynamic>> _users = [];
-  static int _idCounter = 1;
+  StreamSubscription? _docSub;
+  final _userController = StreamController<UserModel?>.broadcast();
+  Stream<UserModel?> get userStream => _userController.stream;
 
-  Future<void> loadSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id');
-    if (userId != null) {
-      final user = _users.firstWhere(
-        (u) => u['id'] == userId,
-        orElse: () => {},
-      );
-      if (user.isNotEmpty) {
+  void _listenToUserDoc(String uid) {
+    _docSub?.cancel();
+    _docSub = _db.collection('customers').doc(uid).snapshots().listen((doc) {
+      if (doc.exists) {
+        final d = doc.data()!;
         _currentUser = UserModel(
-          id: user['id'],
-          name: user['name'],
-          email: user['email'],
-          phone: user['phone'],
+          id: doc.id,
+          name: d['name'] ?? '',
+          email: d['email'] ?? '',
+          phone: d['phone'] ?? '',
         );
+      } else {
+        _currentUser = null;
       }
+      _userController.add(_currentUser);
+    });
+  }
+
+  Future<void> ensureLoaded() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    if (_currentUser != null) return;
+    final doc = await _db.collection('customers').doc(user.uid).get();
+    if (doc.exists) {
+      final d = doc.data()!;
+      _currentUser = UserModel(
+        id: doc.id,
+        name: d['name'] ?? '',
+        email: d['email'] ?? '',
+        phone: d['phone'] ?? '',
+      );
     }
+    _listenToUserDoc(user.uid);
   }
 
   Future<Map<String, dynamic>> register(
       String name, String email, String phone, String password) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    final exists = _users.any((u) => u['email'] == email || u['phone'] == phone);
-    if (exists) {
-      return {'success': false, 'message': 'Email atau no HP sudah terdaftar.'};
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(
+          email: email, password: password);
+      await _db.collection('customers').doc(cred.user!.uid).set({
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      await ensureLoaded();
+      return {'success': true};
+    } on FirebaseAuthException catch (e) {
+      String msg = 'Registrasi gagal.';
+      if (e.code == 'email-already-in-use') msg = 'Email sudah terdaftar.';
+      if (e.code == 'weak-password') msg = 'Password terlalu lemah.';
+      return {'success': false, 'message': msg};
     }
-    final id = 'user_${_idCounter++}';
-    _users.add({
-      'id': id,
-      'name': name,
-      'email': email,
-      'phone': phone,
-      'password': password,
-    });
-    _currentUser = UserModel(id: id, name: name, email: email, phone: phone);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_id', id);
-    return {'success': true};
   }
 
-  Future<Map<String, dynamic>> login(String emailOrPhone, String password) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    final user = _users.firstWhere(
-      (u) =>
-          (u['email'] == emailOrPhone || u['phone'] == emailOrPhone) &&
-          u['password'] == password,
-      orElse: () => {},
-    );
-    if (user.isEmpty) {
-      return {'success': false, 'message': 'Email/No HP atau password salah.'};
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    try {
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await ensureLoaded();
+      return {'success': true};
+    } on FirebaseAuthException catch (_) {
+      return {'success': false, 'message': 'Email atau password salah.'};
     }
-    _currentUser = UserModel(
-      id: user['id'],
-      name: user['name'],
-      email: user['email'],
-      phone: user['phone'],
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_id', user['id']);
-    return {'success': true};
   }
 
-  Future<void> updateProfile({String? name, String? email, String? phone}) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (_currentUser == null) return;
-    final idx = _users.indexWhere((u) => u['id'] == _currentUser!.id);
-    if (idx == -1) return;
-    if (name != null) { _users[idx]['name'] = name; _currentUser!.name = name; }
-    if (email != null) { _users[idx]['email'] = email; _currentUser!.email = email; }
-    if (phone != null) { _users[idx]['phone'] = phone; _currentUser!.phone = phone; }
+  Future<void> updateProfile(
+      {String? name, String? email, String? phone}) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final data = <String, dynamic>{};
+    if (name != null) data['name'] = name;
+    if (email != null) data['email'] = email;
+    if (phone != null) data['phone'] = phone;
+    await _db.collection('customers').doc(user.uid).update(data);
   }
 
   Future<void> deleteAccount() async {
-    if (_currentUser == null) return;
-    _users.removeWhere((u) => u['id'] == _currentUser!.id);
-    await logout();
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await _db.collection('customers').doc(user.uid).delete();
+    await user.delete();
   }
 
   Future<void> logout() async {
+    await _docSub?.cancel();
     _currentUser = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_id');
+    await _auth.signOut();
   }
 }
