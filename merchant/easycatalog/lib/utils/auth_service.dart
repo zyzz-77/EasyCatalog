@@ -1,11 +1,12 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MerchantUser {
   final String id;
   String ownerName;
   String email;
   String phone;
-  String password;
   String restaurantName;
   String restaurantLocation;
   Map<String, dynamic> menu;
@@ -15,32 +16,71 @@ class MerchantUser {
     required this.ownerName,
     required this.email,
     required this.phone,
-    required this.password,
     required this.restaurantName,
     required this.restaurantLocation,
     this.menu = const {},
   });
+
+  factory MerchantUser.fromMap(String id, Map<String, dynamic> d) =>
+      MerchantUser(
+        id: id,
+        ownerName: d['ownerName'] ?? '',
+        email: d['email'] ?? '',
+        phone: d['phone'] ?? '',
+        restaurantName: d['restaurantName'] ?? '',
+        restaurantLocation: d['restaurantLocation'] ?? '',
+        menu: Map<String, dynamic>.from(d['menu'] ?? {}),
+      );
 }
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
-  AuthService._internal();
+  AuthService._internal() {
+    _auth.authStateChanges().listen((user) {
+      if (user == null) {
+        _currentUser = null;
+        _docSub?.cancel();
+      } else {
+        _listenToUserDoc(user.uid);
+      }
+    });
+  }
+
+  final _auth = FirebaseAuth.instance;
+  final _db = FirebaseFirestore.instance;
 
   MerchantUser? _currentUser;
   MerchantUser? get currentUser => _currentUser;
-  bool get isLoggedIn => _currentUser != null;
+  bool get isLoggedIn => _auth.currentUser != null;
 
-  static final List<MerchantUser> _users = [];
-  static int _idCounter = 1;
+  StreamSubscription? _docSub;
+  final _userController = StreamController<MerchantUser?>.broadcast();
+  Stream<MerchantUser?> get userStream => _userController.stream;
 
-  Future<void> loadSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('merchant_user_id');
-    if (userId != null) {
-      final user = _users.where((u) => u.id == userId).firstOrNull;
-      if (user != null) _currentUser = user;
+  void _listenToUserDoc(String uid) {
+    _docSub?.cancel();
+    _docSub = _db.collection('merchants').doc(uid).snapshots().listen((doc) {
+      if (doc.exists) {
+        _currentUser = MerchantUser.fromMap(doc.id, doc.data()!);
+      } else {
+        _currentUser = null;
+      }
+      _userController.add(_currentUser);
+    });
+  }
+
+  /// Dipanggil saat splash screen untuk memastikan data user sudah termuat
+  /// sebelum masuk ke Dashboard.
+  Future<void> ensureLoaded() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    if (_currentUser != null) return;
+    final doc = await _db.collection('merchants').doc(user.uid).get();
+    if (doc.exists) {
+      _currentUser = MerchantUser.fromMap(doc.id, doc.data()!);
     }
+    _listenToUserDoc(user.uid);
   }
 
   Future<Map<String, dynamic>> register({
@@ -51,39 +91,42 @@ class AuthService {
     required String restaurantName,
     required String restaurantLocation,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    final exists = _users.any((u) => u.email == email);
-    if (exists) {
-      return {'success': false, 'message': 'Email sudah terdaftar.'};
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(
+          email: email, password: password);
+      await _db.collection('merchants').doc(cred.user!.uid).set({
+        'ownerName': ownerName,
+        'email': email,
+        'phone': phone,
+        'restaurantName': restaurantName,
+        'restaurantLocation': restaurantLocation,
+        'menu': {},
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      await ensureLoaded();
+      return {'success': true};
+    } on FirebaseAuthException catch (e) {
+      String msg = 'Registrasi gagal.';
+      if (e.code == 'email-already-in-use') msg = 'Email sudah terdaftar.';
+      if (e.code == 'weak-password') msg = 'Password terlalu lemah.';
+      return {'success': false, 'message': msg};
     }
-    final id = 'merchant_${_idCounter++}';
-    final user = MerchantUser(
-      id: id,
-      ownerName: ownerName,
-      email: email,
-      phone: phone,
-      password: password,
-      restaurantName: restaurantName,
-      restaurantLocation: restaurantLocation,
-      menu: {},
-    );
-    _users.add(user);
-    _currentUser = user;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('merchant_user_id', id);
-    return {'success': true};
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    final user = _users.where((u) => u.email == email && u.password == password).firstOrNull;
-    if (user == null) {
-      return {'success': false, 'message': 'Email atau password salah.'};
+    try {
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await ensureLoaded();
+      return {'success': true};
+    } on FirebaseAuthException catch (e) {
+      String msg = 'Login gagal.';
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential') {
+        msg = 'Email atau password salah.';
+      }
+      return {'success': false, 'message': msg};
     }
-    _currentUser = user;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('merchant_user_id', user.id);
-    return {'success': true};
   }
 
   Future<void> updateProfile({
@@ -93,32 +136,57 @@ class AuthService {
     String? restaurantName,
     String? restaurantLocation,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (_currentUser == null) return;
-    if (ownerName != null) _currentUser!.ownerName = ownerName;
-    if (email != null) _currentUser!.email = email;
-    if (phone != null) _currentUser!.phone = phone;
-    if (restaurantName != null) _currentUser!.restaurantName = restaurantName;
-    if (restaurantLocation != null) _currentUser!.restaurantLocation = restaurantLocation;
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final data = <String, dynamic>{};
+    if (ownerName != null) data['ownerName'] = ownerName;
+    if (email != null) data['email'] = email;
+    if (phone != null) data['phone'] = phone;
+    if (restaurantName != null) data['restaurantName'] = restaurantName;
+    if (restaurantLocation != null)
+      data['restaurantLocation'] = restaurantLocation;
+    await _db.collection('merchants').doc(user.uid).update(data);
   }
 
-  Future<Map<String, dynamic>> changePassword(String oldPassword, String newPassword) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (_currentUser == null) return {'success': false, 'message': 'Tidak ada user.'};
-    if (_currentUser!.password != oldPassword) {
+  Future<void> updateRestaurantInfo(String name, String location) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await _db.collection('merchants').doc(user.uid).set({
+      'restaurantName': name,
+      'restaurantLocation': location,
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> updateMenu(Map<String, dynamic> menu) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await _db
+        .collection('merchants')
+        .doc(user.uid)
+        .set({'menu': menu}, SetOptions(merge: true));
+  }
+
+  Future<Map<String, dynamic>> changePassword(
+      String oldPassword, String newPassword) async {
+    final user = _auth.currentUser;
+    if (user == null) return {'success': false, 'message': 'Tidak ada user.'};
+    try {
+      final cred = EmailAuthProvider.credential(
+          email: user.email!, password: oldPassword);
+      await user.reauthenticateWithCredential(cred);
+      await user.updatePassword(newPassword);
+      return {'success': true};
+    } on FirebaseAuthException catch (_) {
       return {'success': false, 'message': 'Password lama salah.'};
     }
-    _currentUser!.password = newPassword;
-    return {'success': true};
   }
 
   Future<void> logout() async {
+    await _docSub?.cancel();
     _currentUser = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('merchant_user_id');
+    await _auth.signOut();
   }
 
-  // Restaurant methods
   Map<String, dynamic>? get restaurant {
     if (_currentUser == null) return null;
     return {
@@ -126,14 +194,5 @@ class AuthService {
       'location': _currentUser!.restaurantLocation,
       'menu': _currentUser!.menu,
     };
-  }
-
-  void updateRestaurantInfo(String name, String location) {
-    _currentUser?.restaurantName = name;
-    _currentUser?.restaurantLocation = location;
-  }
-
-  void updateMenu(Map<String, dynamic> menu) {
-    _currentUser?.menu = menu;
   }
 }

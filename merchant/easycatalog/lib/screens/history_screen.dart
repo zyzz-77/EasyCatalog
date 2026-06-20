@@ -62,8 +62,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     selectedColor: AppTheme.primary.withOpacity(0.15),
                     checkmarkColor: AppTheme.primary,
                     labelStyle: TextStyle(
-                      color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected
+                          ? AppTheme.primary
+                          : AppTheme.textSecondary,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
                     ),
                     side: BorderSide(
                       color: isSelected ? AppTheme.primary : AppTheme.divider,
@@ -121,7 +124,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(Icons.history_rounded, size: 48, color: Colors.grey[300]),
+                  Icon(Icons.history_rounded,
+                      size: 48, color: Colors.grey[300]),
                   const SizedBox(height: 12),
                   const Text('Belum ada history',
                       style: TextStyle(color: AppTheme.textSecondary)),
@@ -183,8 +187,8 @@ class _SummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(label,
-              style: const TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 11)),
+              style:
+                  const TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
         ],
       ),
     );
@@ -192,7 +196,7 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _HistoryCard extends StatelessWidget {
-  final Order order;
+  final MerchantOrder order;
   final String Function(int) formatPrice;
   final String Function(DateTime?) formatTime;
 

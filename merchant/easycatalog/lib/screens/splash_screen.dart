@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:easycatalog/utils/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:easycatalog/utils/app_theme.dart';
 import 'package:easycatalog/screens/login_screen.dart';
 import 'package:easycatalog/screens/dashboard_screen.dart';
@@ -11,7 +11,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
@@ -34,19 +35,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _navigate() async {
-    final auth = AuthService();
-    await auth.loadSession();
     await Future.delayed(const Duration(milliseconds: 2000));
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => auth.isLoggedIn
-              ? const DashboardScreen()
-              : const LoginScreen(),
-        ),
-      );
-    }
+    if (!mounted) return;
+    final user = FirebaseAuth.instance.currentUser;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            user != null ? const DashboardScreen() : const LoginScreen(),
+      ),
+    );
   }
 
   @override

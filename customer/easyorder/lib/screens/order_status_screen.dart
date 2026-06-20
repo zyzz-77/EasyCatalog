@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:easyorder/utils/app_theme.dart';
+import 'package:easyorder/utils/order_service.dart';
 import 'package:easyorder/models/models.dart';
 
 class OrderStatusScreen extends StatefulWidget {
@@ -12,15 +14,41 @@ class OrderStatusScreen extends StatefulWidget {
 }
 
 class _OrderStatusScreenState extends State<OrderStatusScreen> {
+  final _orderService = OrderService();
+  StreamSubscription? _sub;
+  late CustomerOrder _order;
+
+  @override
+  void initState() {
+    super.initState();
+    _order = widget.order;
+    _sub = _orderService.onChange.listen((_) {
+      final updated = _orderService.activeOrders
+          .followedBy(_orderService.historyOrders)
+          .where((o) => o.id == _order.id);
+      if (updated.isNotEmpty && mounted) {
+        setState(() => _order = updated.first);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
   String _formatPrice(int price) {
     return price.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
   }
 
   Color get _statusColor {
-    switch (widget.order.status) {
+    switch (_order.status) {
+      case OrderStatus.menunggu:
+        return Colors.grey;
       case OrderStatus.diproses:
         return Colors.orange;
       case OrderStatus.ready:
@@ -31,7 +59,9 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
   }
 
   IconData get _statusIcon {
-    switch (widget.order.status) {
+    switch (_order.status) {
+      case OrderStatus.menunggu:
+        return Icons.hourglass_empty_rounded;
       case OrderStatus.diproses:
         return Icons.soup_kitchen_rounded;
       case OrderStatus.ready:
@@ -46,7 +76,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Text('Status ${widget.order.id}'),
+        title: Text('Status Pesanan ${_order.customerName}'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -80,7 +110,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    widget.order.statusLabel,
+                    _order.statusLabel,
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -89,7 +119,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    widget.order.statusDesc,
+                    _order.statusDesc,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppTheme.textSecondary,
@@ -112,44 +142,55 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
               child: Column(
                 children: [
                   _StepItem(
+                    label: 'Menunggu Konfirmasi',
+                    desc: 'Menunggu restoran menerima pesanan',
+                    done: _order.status != OrderStatus.menunggu,
+                    isActive: _order.status == OrderStatus.menunggu,
+                    icon: Icons.hourglass_empty_rounded,
+                  ),
+                  _StepDivider(
+                    active: _order.status != OrderStatus.menunggu,
+                  ),
+                  _StepItem(
                     label: 'Pesanan diterima',
                     desc: 'Pesanan Anda masuk ke restoran',
-                    done: true,
-                    isActive: widget.order.status == OrderStatus.diproses,
+                    done: _order.status != OrderStatus.menunggu,
+                    isActive: false,
                     icon: Icons.receipt_rounded,
                   ),
                   _StepDivider(
-                    active: widget.order.status != OrderStatus.diproses,
+                    active: _order.status == OrderStatus.diproses ||
+                        _order.status == OrderStatus.ready ||
+                        _order.status == OrderStatus.selesai,
                   ),
                   _StepItem(
-                    label: 'Sedang disiapkan',
+                    label: 'Diproses',
                     desc: 'Restoran sedang menyiapkan pesanan',
-                    done: widget.order.status != OrderStatus.diproses,
-                    isActive: widget.order.status == OrderStatus.diproses,
+                    done: _order.status == OrderStatus.ready ||
+                        _order.status == OrderStatus.selesai,
+                    isActive: _order.status == OrderStatus.diproses,
                     icon: Icons.soup_kitchen_rounded,
                   ),
                   _StepDivider(
-                    active:
-                        widget.order.status == OrderStatus.ready ||
-                        widget.order.status == OrderStatus.selesai,
+                    active: _order.status == OrderStatus.ready ||
+                        _order.status == OrderStatus.selesai,
                   ),
                   _StepItem(
                     label: 'Siap diambil',
                     desc: 'Pesanan siap! Silakan ambil di restoran',
-                    done:
-                        widget.order.status == OrderStatus.ready ||
-                        widget.order.status == OrderStatus.selesai,
-                    isActive: widget.order.status == OrderStatus.ready,
+                    done: _order.status == OrderStatus.ready ||
+                        _order.status == OrderStatus.selesai,
+                    isActive: _order.status == OrderStatus.ready,
                     icon: Icons.notifications_active_rounded,
                   ),
                   _StepDivider(
-                    active: widget.order.status == OrderStatus.selesai,
+                    active: _order.status == OrderStatus.selesai,
                   ),
                   _StepItem(
                     label: 'Selesai',
                     desc: 'Pesanan telah diambil',
-                    done: widget.order.status == OrderStatus.selesai,
-                    isActive: widget.order.status == OrderStatus.selesai,
+                    done: _order.status == OrderStatus.selesai,
+                    isActive: _order.status == OrderStatus.selesai,
                     icon: Icons.check_circle_rounded,
                   ),
                 ],
@@ -178,19 +219,12 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
                           color: AppTheme.textPrimary,
                         ),
                       ),
-                      Text(
-                        widget.order.id,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   const Divider(height: 1),
                   const SizedBox(height: 12),
-                  ...widget.order.items.map(
+                  ..._order.items.map(
                     (item) => Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Row(
@@ -233,7 +267,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
                         ),
                       ),
                       Text(
-                        'Rp ${_formatPrice(widget.order.total)}',
+                        'Rp ${_formatPrice(_order.total)}',
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           color: AppTheme.primary,
@@ -270,14 +304,15 @@ class _StepItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = done ? AppTheme.primary : Colors.grey.shade300;
+    final highlighted = done || isActive;
+    final color = highlighted ? AppTheme.primary : Colors.grey.shade300;
     return Row(
       children: [
         Container(
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: done
+            color: highlighted
                 ? AppTheme.primary.withOpacity(0.1)
                 : Colors.grey.shade100,
             shape: BoxShape.circle,
@@ -294,7 +329,9 @@ class _StepItem extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: done ? AppTheme.textPrimary : AppTheme.textSecondary,
+                  color: highlighted
+                      ? AppTheme.textPrimary
+                      : AppTheme.textSecondary,
                   fontSize: 13,
                 ),
               ),
@@ -311,6 +348,12 @@ class _StepItem extends StatelessWidget {
         if (done)
           const Icon(
             Icons.check_circle_rounded,
+            color: AppTheme.primary,
+            size: 18,
+          )
+        else if (isActive)
+          Icon(
+            Icons.radio_button_checked_rounded,
             color: AppTheme.primary,
             size: 18,
           ),
@@ -330,9 +373,8 @@ class _StepDivider extends StatelessWidget {
       child: Container(
         width: 2,
         height: 20,
-        color: active
-            ? AppTheme.primary.withOpacity(0.3)
-            : Colors.grey.shade200,
+        color:
+            active ? AppTheme.primary.withOpacity(0.3) : Colors.grey.shade200,
       ),
     );
   }

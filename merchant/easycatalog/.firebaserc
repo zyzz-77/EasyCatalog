@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "default": "easycatalog-app"
+  },
+  "targets": {
+    "easycatalog-app": {
+      "hosting": {
+        "merchant": ["easycatalog-merchant"]
+      }
+    }
+  }
+}

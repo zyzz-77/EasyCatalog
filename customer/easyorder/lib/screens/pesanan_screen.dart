@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:easyorder/utils/app_theme.dart';
 import 'package:easyorder/utils/order_service.dart';
@@ -13,6 +14,21 @@ class PesananScreen extends StatefulWidget {
 
 class _PesananScreenState extends State<PesananScreen> {
   final _orderService = OrderService();
+  StreamSubscription? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = _orderService.onChange.listen((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
 
   String _formatPrice(int price) {
     return price.toString().replaceAllMapped(
@@ -21,17 +37,27 @@ class _PesananScreenState extends State<PesananScreen> {
 
   Color _statusColor(OrderStatus s) {
     switch (s) {
-      case OrderStatus.diproses: return Colors.orange;
-      case OrderStatus.ready: return Colors.blue;
-      case OrderStatus.selesai: return Colors.green;
+      case OrderStatus.menunggu:
+        return Colors.grey;
+      case OrderStatus.diproses:
+        return Colors.orange;
+      case OrderStatus.ready:
+        return Colors.blue;
+      case OrderStatus.selesai:
+        return Colors.green;
     }
   }
 
   IconData _statusIcon(OrderStatus s) {
     switch (s) {
-      case OrderStatus.diproses: return Icons.soup_kitchen_rounded;
-      case OrderStatus.ready: return Icons.notifications_active_rounded;
-      case OrderStatus.selesai: return Icons.check_circle_rounded;
+      case OrderStatus.menunggu:
+        return Icons.hourglass_empty_rounded;
+      case OrderStatus.diproses:
+        return Icons.soup_kitchen_rounded;
+      case OrderStatus.ready:
+        return Icons.notifications_active_rounded;
+      case OrderStatus.selesai:
+        return Icons.check_circle_rounded;
     }
   }
 
@@ -66,8 +92,8 @@ class _PesananScreenState extends State<PesananScreen> {
                           color: AppTheme.textPrimary)),
                   const SizedBox(height: 8),
                   const Text('Pesan makanan dari tab Menu',
-                      style:
-                          TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                      style: TextStyle(
+                          color: AppTheme.textSecondary, fontSize: 13)),
                 ],
               ),
             )
@@ -83,8 +109,7 @@ class _PesananScreenState extends State<PesananScreen> {
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) =>
-                                  OrderStatusScreen(order: order)),
+                              builder: (_) => OrderStatusScreen(order: order)),
                         );
                         setState(() {});
                       },
@@ -162,7 +187,7 @@ class _PesananScreenState extends State<PesananScreen> {
                                     Icon(Icons.notifications_active_rounded,
                                         color: Colors.blue, size: 16),
                                     SizedBox(width: 8),
-                                    Text('Pesanan siap! Silakan ambil di restoran',
+                                    Text('Pesanan siap! Silakan ambil di kasir',
                                         style: TextStyle(
                                             color: Colors.blue,
                                             fontSize: 12,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:easycatalog/utils/auth_service.dart';
 import 'package:easycatalog/utils/api_service.dart';
@@ -26,10 +27,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic>? _user;
   bool _loading = true;
 
+  StreamSubscription? _orderSub;
+  StreamSubscription? _userSub;
+
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _auth.ensureLoaded();
+    await _orderService.ensureLoaded();
+    _orderSub = _orderService.onChange.listen((_) {
+      if (mounted) setState(() {});
+    });
+    _userSub = _auth.userStream.listen((_) {
+      if (mounted) setState(() {});
+    });
+    await _fetchData();
   }
 
   Future<void> _fetchData() async {
@@ -45,6 +61,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       setState(() => _loading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _orderSub?.cancel();
+    _userSub?.cancel();
+    super.dispose();
   }
 
   void _logout() {

@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:easyorder/models/models.dart';
+import 'package:easyorder/utils/data_service.dart';
 
-// Cart
 class CartService {
   static final CartService _instance = CartService._internal();
   factory CartService() => _instance;
@@ -40,48 +43,93 @@ class CartService {
   void clear() => _items.clear();
 }
 
-// Order
 class OrderService {
   static final OrderService _instance = OrderService._internal();
   factory OrderService() => _instance;
-  OrderService._internal();
+  OrderService._internal() {
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user == null) {
+        _ordersSub?.cancel();
+        _allOrders = [];
+      } else {
+        _listenOrders(user.uid);
+      }
+    });
+  }
 
-  final List<CustomerOrder> _activeOrders = [];
-  final List<CustomerOrder> _historyOrders = [];
-  int _orderCounter = 1;
+  final _db = FirebaseFirestore.instance;
 
-  List<CustomerOrder> get activeOrders => List.unmodifiable(_activeOrders);
-  List<CustomerOrder> get historyOrders => List.unmodifiable(_historyOrders);
+  List<CustomerOrder> _allOrders = [];
+  StreamSubscription? _ordersSub;
 
-  CustomerOrder placeOrder(String customerName, List<CartItem> cartItems) {
-    final items = cartItems
-        .map((c) => OrderItem(name: c.name, price: c.price, qty: c.qty))
-        .toList();
-    final order = CustomerOrder(
-      id: 'ORD-${_orderCounter.toString().padLeft(3, '0')}',
+  final _changeController = StreamController<void>.broadcast();
+  Stream<void> get onChange => _changeController.stream;
+
+  void _listenOrders(String customerId) {
+    print('LISTENING ORDERS FOR: $customerId');
+    _ordersSub?.cancel();
+    _ordersSub = _db
+        .collectionGroup('orders')
+        .where('customerId', isEqualTo: customerId)
+        .snapshots()
+        .listen((snap) {
+      print('SNAPSHOT RECEIVED: ${snap.docs.length} docs');
+      _allOrders = snap.docs.map((d) => CustomerOrder.fromFirestore(d)).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _changeController.add(null);
+    }, onError: (e) {
+      print('ORDER STREAM ERROR: $e');
+    });
+  }
+
+  Future<void> ensureLoaded() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    if (_ordersSub != null) return;
+    _listenOrders(uid);
+  }
+
+  List<CustomerOrder> get activeOrders =>
+      _allOrders.where((o) => o.status != OrderStatus.selesai).toList();
+
+  List<CustomerOrder> get historyOrders =>
+      _allOrders.where((o) => o.status == OrderStatus.selesai).toList();
+
+  Future<CustomerOrder> placeOrder(
+      String customerName, List<CartItem> cartItems) async {
+    final merchantId = DataService().merchantId;
+    if (merchantId == null) throw Exception('merchantId tidak ada');
+    final customerId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    final items = cartItems.map((c) => c.toOrderItem().toMap()).toList();
+    final total = cartItems.fold(0, (sum, c) => sum + c.subtotal);
+
+    final ref = await _db
+        .collection('merchants')
+        .doc(merchantId)
+        .collection('orders')
+        .add({
+      'customerId': customerId,
+      'customerName': customerName,
+      'merchantId': merchantId,
+      'items': items,
+      'total': total,
+      'status': 'menunggu',
+      'createdAt': FieldValue.serverTimestamp(),
+      'completedAt': null,
+    });
+
+    return CustomerOrder(
+      id: ref.id,
       customerName: customerName,
-      items: items,
-      status: OrderStatus.diproses,
+      merchantId: merchantId,
+      items: cartItems.map((c) => c.toOrderItem()).toList(),
+      status: OrderStatus.menunggu,
       createdAt: DateTime.now(),
     );
-    _orderCounter++;
-    _activeOrders.insert(0, order);
-    return order;
   }
+}
 
-  // Simulate merchant updating status (for demo)
-  void simulateReady(String orderId) {
-    final idx = _activeOrders.indexWhere((o) => o.id == orderId);
-    if (idx >= 0) _activeOrders[idx].status = OrderStatus.ready;
-  }
-
-  void simulateSelesai(String orderId) {
-    final idx = _activeOrders.indexWhere((o) => o.id == orderId);
-    if (idx < 0) return;
-    final order = _activeOrders[idx];
-    order.status = OrderStatus.selesai;
-    order.completedAt = DateTime.now();
-    _activeOrders.removeAt(idx);
-    _historyOrders.insert(0, order);
-  }
+extension on CartItem {
+  OrderItem toOrderItem() => OrderItem(name: name, price: price, qty: qty);
 }

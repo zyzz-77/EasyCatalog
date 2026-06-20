@@ -29,7 +29,11 @@ class _BerandaScreenState extends State<BerandaScreen> {
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
   }
 
-  void _markReady(Order order) {
+  void _confirmOrder(MerchantOrder order) {
+    setState(() => _orderService.confirmOrder(order.id));
+  }
+
+  void _markReady(MerchantOrder order) {
     setState(() => _orderService.markReady(order.id));
     widget.onOrderChanged();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -40,7 +44,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
     ));
   }
 
-  void _markSelesai(Order order) {
+  void _markSelesai(MerchantOrder order) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -270,6 +274,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
                     else
                       ...activeOrders.map((order) => _OrderCard(
                             order: order,
+                            onConfirm: () => _confirmOrder(order),
                             onMarkReady: () => _markReady(order),
                             onMarkSelesai: () => _markSelesai(order),
                             formatPrice: _formatPrice,
@@ -288,13 +293,15 @@ class _BerandaScreenState extends State<BerandaScreen> {
 }
 
 class _OrderCard extends StatelessWidget {
-  final Order order;
+  final MerchantOrder order;
+  final VoidCallback onConfirm;
   final VoidCallback onMarkReady;
   final VoidCallback onMarkSelesai;
   final String Function(int) formatPrice;
 
   const _OrderCard({
     required this.order,
+    required this.onConfirm,
     required this.onMarkReady,
     required this.onMarkSelesai,
     required this.formatPrice,
@@ -302,6 +309,8 @@ class _OrderCard extends StatelessWidget {
 
   Color get _statusColor {
     switch (order.status) {
+      case OrderStatus.menunggu:
+        return Colors.grey;
       case OrderStatus.diproses:
         return Colors.orange;
       case OrderStatus.ready:
@@ -313,6 +322,8 @@ class _OrderCard extends StatelessWidget {
 
   IconData get _statusIcon {
     switch (order.status) {
+      case OrderStatus.menunggu:
+        return Icons.hourglass_empty_rounded;
       case OrderStatus.diproses:
         return Icons.soup_kitchen_rounded;
       case OrderStatus.ready:
@@ -431,6 +442,18 @@ class _OrderCard extends StatelessWidget {
             // Action buttons
             Row(
               children: [
+                if (order.status == OrderStatus.menunggu)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: onConfirm,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      icon: const Icon(Icons.check_rounded, size: 16),
+                      label: const Text('Terima Pesanan'),
+                    ),
+                  ),
                 if (order.status == OrderStatus.diproses)
                   Expanded(
                     child: ElevatedButton.icon(
