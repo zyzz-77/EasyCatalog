@@ -4,6 +4,7 @@ import 'package:easyorder/utils/auth_service.dart';
 import 'package:easyorder/utils/order_service.dart';
 import 'package:easyorder/models/models.dart';
 import 'package:easyorder/screens/login_screen.dart';
+import 'package:easyorder/screens/order_status_screen.dart';
 
 class ProfilScreen extends StatefulWidget {
   const ProfilScreen({super.key});
@@ -46,7 +47,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
       email: _emailCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
     );
-    setState(() { _saving = false; _editMode = false; });
+    setState(() {
+      _saving = false;
+      _editMode = false;
+    });
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Profil berhasil diperbarui!'),
@@ -61,20 +65,25 @@ class _ProfilScreenState extends State<ProfilScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Keluar?', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Keluar?',
+            style: TextStyle(fontWeight: FontWeight.w700)),
         content: const Text('Anda akan keluar dari akun ini.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal')),
           ElevatedButton(
             onPressed: () async {
               await _auth.logout();
               if (mounted) {
-                Navigator.pushAndRemoveUntil(context,
+                Navigator.pushAndRemoveUntil(
+                    context,
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                     (_) => false);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
             child: const Text('Keluar'),
           ),
         ],
@@ -89,14 +98,18 @@ class _ProfilScreenState extends State<ProfilScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Hapus Akun?',
             style: TextStyle(fontWeight: FontWeight.w700, color: Colors.red)),
-        content: const Text('Akun Anda akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.'),
+        content: const Text(
+            'Akun Anda akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal')),
           ElevatedButton(
             onPressed: () async {
               await _auth.deleteAccount();
               if (mounted) {
-                Navigator.pushAndRemoveUntil(context,
+                Navigator.pushAndRemoveUntil(
+                    context,
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                     (_) => false);
               }
@@ -149,7 +162,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     radius: 40,
                     backgroundColor: Colors.white.withOpacity(0.2),
                     child: Text(
-                      (_auth.currentUser?.name ?? 'P').substring(0, 1).toUpperCase(),
+                      (_auth.currentUser?.name ?? 'P')
+                          .substring(0, 1)
+                          .toUpperCase(),
                       style: const TextStyle(
                           color: Colors.white,
                           fontSize: 32,
@@ -184,7 +199,8 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
                     child: Row(
                       children: [
-                        const Icon(Icons.person_outline, color: AppTheme.primary),
+                        const Icon(Icons.person_outline,
+                            color: AppTheme.primary),
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text('Info Akun',
@@ -192,9 +208,11 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                   fontWeight: FontWeight.w700, fontSize: 15)),
                         ),
                         TextButton(
-                          onPressed: () => setState(() => _editMode = !_editMode),
+                          onPressed: () =>
+                              setState(() => _editMode = !_editMode),
                           child: Text(_editMode ? 'Batal' : 'Edit',
-                              style: const TextStyle(color: AppTheme.primaryLight)),
+                              style: const TextStyle(
+                                  color: AppTheme.primaryLight)),
                         ),
                       ],
                     ),
@@ -214,8 +232,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                     prefixIcon: Icon(Icons.person_outline,
                                         color: AppTheme.primary),
                                   ),
-                                  validator: (v) =>
-                                      v == null || v.isEmpty ? 'Wajib diisi' : null,
+                                  validator: (v) => v == null || v.isEmpty
+                                      ? 'Wajib diisi'
+                                      : null,
                                 ),
                                 const SizedBox(height: 12),
                                 TextFormField(
@@ -225,8 +244,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                     prefixIcon: Icon(Icons.email_outlined,
                                         color: AppTheme.primary),
                                   ),
-                                  validator: (v) =>
-                                      v == null || v.isEmpty ? 'Wajib diisi' : null,
+                                  validator: (v) => v == null || v.isEmpty
+                                      ? 'Wajib diisi'
+                                      : null,
                                 ),
                                 const SizedBox(height: 12),
                                 TextFormField(
@@ -236,15 +256,17 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                     prefixIcon: Icon(Icons.phone_outlined,
                                         color: AppTheme.primary),
                                   ),
-                                  validator: (v) =>
-                                      v == null || v.isEmpty ? 'Wajib diisi' : null,
+                                  validator: (v) => v == null || v.isEmpty
+                                      ? 'Wajib diisi'
+                                      : null,
                                 ),
                                 const SizedBox(height: 14),
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton(
                                     onPressed: _saving ? null : _saveProfile,
-                                    child: Text(_saving ? 'Menyimpan...' : 'Simpan'),
+                                    child: Text(
+                                        _saving ? 'Menyimpan...' : 'Simpan'),
                                   ),
                                 ),
                               ],
@@ -252,11 +274,20 @@ class _ProfilScreenState extends State<ProfilScreen> {
                           )
                         : Column(
                             children: [
-                              _InfoRow(icon: Icons.person_outline, label: 'Nama', value: _auth.currentUser?.name ?? '-'),
+                              _InfoRow(
+                                  icon: Icons.person_outline,
+                                  label: 'Nama',
+                                  value: _auth.currentUser?.name ?? '-'),
                               const SizedBox(height: 10),
-                              _InfoRow(icon: Icons.email_outlined, label: 'Email', value: _auth.currentUser?.email ?? '-'),
+                              _InfoRow(
+                                  icon: Icons.email_outlined,
+                                  label: 'Email',
+                                  value: _auth.currentUser?.email ?? '-'),
                               const SizedBox(height: 10),
-                              _InfoRow(icon: Icons.phone_outlined, label: 'No HP', value: _auth.currentUser?.phone ?? '-'),
+                              _InfoRow(
+                                  icon: Icons.phone_outlined,
+                                  label: 'No HP',
+                                  value: _auth.currentUser?.phone ?? '-'),
                             ],
                           ),
                   ),
@@ -348,7 +379,8 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _InfoRow({required this.icon, required this.label, required this.value});
+  const _InfoRow(
+      {required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -359,8 +391,8 @@ class _InfoRow extends StatelessWidget {
         SizedBox(
           width: 60,
           child: Text(label,
-              style: const TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 13)),
+              style:
+                  const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
         ),
         Expanded(
           child: Text(value,
@@ -387,45 +419,55 @@ class _HistoryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+    return InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrderStatusScreen(order: order),
             ),
-            child: const Icon(Icons.check_circle_rounded,
-                color: Colors.green, size: 18),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(order.id,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                        fontSize: 13)),
-                Text('${order.items.length} item · ${formatTime(order.completedAt)}',
-                    style: const TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 11)),
-              ],
-            ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.check_circle_rounded,
+                    color: Colors.green, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(order.id,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                            fontSize: 13)),
+                    Text(
+                        '${order.items.length} item · ${formatTime(order.completedAt)}',
+                        style: const TextStyle(
+                            color: AppTheme.textSecondary, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Text('Rp ${formatPrice(order.total)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primary,
+                      fontSize: 13)),
+            ],
           ),
-          Text('Rp ${formatPrice(order.total)}',
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.primary,
-                  fontSize: 13)),
-        ],
-      ),
-    );
+        ));
   }
 }

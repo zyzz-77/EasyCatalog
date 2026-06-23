@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "480255427124",
+    "project_id": "easycatalog-app",
+    "storage_bucket": "easycatalog-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:480255427124:android:198fe0d73fb6fa9bc64061",
+        "android_client_info": {
+          "package_name": "com.example.easycatalog"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDP2KwZ4St9Z5k9HM6ofimebEf3DikMeaA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

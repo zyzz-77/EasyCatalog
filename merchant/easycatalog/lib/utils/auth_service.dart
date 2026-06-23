@@ -163,7 +163,11 @@ class AuthService {
     await _db
         .collection('merchants')
         .doc(user.uid)
-        .set({'menu': menu}, SetOptions(merge: true));
+        .set({'menu': menu}, SetOptions(mergeFields: ['menu']));
+    if (_currentUser != null) {
+      _currentUser!.menu = menu;
+      _userController.add(_currentUser);
+    }
   }
 
   Future<Map<String, dynamic>> changePassword(
